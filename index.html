@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style type="text/css">
+    body{
+    background-image: url(space%20illo.svg);
+    background-repeat: no-repeat;
+    background-size: cover;
+    margin: auto;
+        
+    text-align: center;
+        
+    }
+    text {
+      font: 10px sans-serif;
+      pointer-events: none;
+    }
+    circle {
+        stroke: #565352;
+        stroke-width: 0.5px;
+    }
+    svg{
+      display: block;
+      margin: 0 auto;
+        
+         
+    }
+    
+    h1{font-family: "courier new","arial";
+        font-weight:lighter;
+        font-size: 65px;
+        color:white;
+        letter-spacing: -3px;
+        word-spacing: -10px;
+     
+    }
+   
+    div{font-family:"arial";
+        font-size:18px;
+        color:dimgrey;
+        font-weight: lighter;
+        margin-left: auto;
+        margin-right: auto;
+        max-width: 600px;
+        
+        
+      }
+
+</style>
+</head>
+<body>
+
+    
+<h1>What shape is a UFO?</h1>
+
+<script src="js/d3.v5.min.js"></script>
+<script>
+var test;
+
+d3.csv("ufos3.csv").then(function(data){
+
+  //set header values for your own spreadsheet of data
+  var categories = "Category",
+      values     = "Amount",
+      names      = "Shape of Object";
+
+ 
+  //range of colors for each category
+  var colorRange = [
+      //medium
+      "#00ab4f", 
+      //light
+      "#4bc174",
+      //small
+      "#2aad58",
+  //large
+  "#68f692"];
+
+
+  //this convert numerical data from strings into numbers
+  data.forEach(function(d){
+    d[values] = +d[values];
+  });
+
+  //set margins and size of your svg
+  var margin = {top:-100, right:10, bottom:10, left:10},
+      width  = 900 - margin.left - margin.right, 
+      height = 700  - margin.top  - margin.bottom;
+
+
+  //setup main svg box
+  var svg = d3.select("body")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom);
+
+
+  //chart grouping that will house the actual chart
+  var chart = svg.append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+
+  //get the unique categories in your data
+  var categories_array = d3.map(data, function(d){ return d[categories]; }).keys();
+
+    
+  //setup colors for the categories
+  var color = d3.scaleOrdinal()
+    .domain(d3.map(data, function(d){ return d[categories]; }).keys())
+    .range(colorRange);
+
+  
+  //create a grouped hierarchy based on categories.
+  var node_hierarchy = categories_array.map(function(d){
+    let cat_data = data.filter(function(k){ return k[categories] == d; });
+    return {name: d, children: cat_data};
+  });
+
+  //we setup a pack layout to group the bubbles better for initial view
+  var packLayout = d3.pack()
+    .size([width, height])
+    .padding(5)
+    
+
+  //setup a d3.hierarchy object
+  var rootNode = d3.hierarchy({children: data}) //change to node_hierarchy for bubble pack
+    .sum(function(d){return d[values]; })
+    .sort(function(a,b){ return b[categories] - a[categories]; });
+
+  //apply packlayout
+  packLayout(rootNode);
+
+  //make some bubbles!
+  var bubbles = chart.selectAll("circle")
+    .data(rootNode.leaves()); //change to descendants() for bubble pack layout
+
+
+  //Since bubbles are immutable in d3 v5, setup bubbles after data-join and merge afterwards
+  var bubblesE = bubbles.enter().append("circle")
+    .classed("bubble", true)
+    .attr("cx", function(d){ return d.x; })
+    .attr("cy", function(d){ return d.y; })
+    .attr("r",  function(d){ return d.r; })
+    .attr("fill", function(d){ 
+
+      return color(d.data[categories]);
+
+      /* if using bubble pack layout instead */
+      // if(d.depth == 2){ //two levels in on circles
+      //   return color(d.data[categories]);
+      // } else if(d.depth == 1){ 
+      //   return "#E3EAED";
+      // } else {
+      //   return "none";
+      // }
+    })
+    .attr("stroke", function(d){ return d3.rgb(color(d.data[categories])).darker(); })
+    .attr("stroke-width", 1);
+
+  //merge with original variable
+  bubbles = bubbles.merge(bubblesE);
+
+
+
+  //setup text
+  var text = chart.selectAll("text")
+    .data(rootNode.leaves());
+   
+  //text over bubbles
+  var textE = text.enter()
+    .append("text")
+    .text(function(d){ return d.data[names].trim();})
+    .attr("text-anchor", "middle")
+    .style("font-size", "11px")
+    .style("font-family", "arial")
+    .attr("x", function(d){ return d.x; })
+    .attr("y", function(d){ return d.y; })
+    .each(wrap);
+
+  text = text.merge(textE);
+
+
+});
+
+//text wrapping function
+function wrap(d) {
+
+    var t = d3.select(this),
+      twidth = d.r * 2,
+      x = d.x,
+      y = d.y,
+      words = t.text().split(/\s+/).reverse(),
+      word,
+      line = [],
+      lineNumber = 0,
+      lineHeight = 1.2,
+      tspan = t.text(null).append("tspan").attr("x", x).attr("y", y).attr("alignment-baseline", "middle");
+
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > twidth) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        tspan = t.append("tspan").attr("x", x).attr("y", y).attr("dy", ++lineNumber * lineHeight + "em").text(word);
+      }
+    }
+}
+    
+</script>
+ <div>  
+ Is it a bird? Is it an egg? It's an Unidentified Flying Object. I scraped 80,000 rows of UFO Sighting data to visualize what the common mysterious shapes in the sky are. Data from: National UFO Reporting Center (NUFORC). Chart by: Chloe Reynolds.   
+     </div> 
+</body>
+</html> 
